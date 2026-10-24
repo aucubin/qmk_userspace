@@ -80,6 +80,14 @@ const uint16_t PROGMEM encoder_map[][NUM_ENCODERS][NUM_DIRECTIONS] = {
 };
 #endif // ENCODER_MAP_ENABLE
 
+bool process_detected_host_os_user(os_variant_t detected_os) {
+    // keep mac layout as is, swap ctrl and win on linux/windows
+    bool swap = detected_os == OS_LINUX || detected_os == OS_WINDOWS;
+    keymap_config.swap_lctl_lgui = swap;
+    keymap_config.swap_rctl_rgui = swap;
+    return true;
+}
+
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     os_variant_t detected_os = detected_host_os();
     switch(keycode) {
