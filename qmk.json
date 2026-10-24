@@ -1,4 +1,9 @@
 {
-    "userspace_version": "1.0",
-    "build_targets": []
+    "userspace_version": "1.1",
+    "build_targets": [
+        ["beekeeb/piantor", "aucubin"],
+        ["crkbd/rev1", "aucubin"],
+        ["hazel/bad_wings_v2", "aucubin"],
+        ["keychron/q8/iso_encoder", "aucubin"]
+    ]
 }
