@@ -6,4 +6,6 @@
 #define OLED_FONT_H "keyboards/crkbd/lib/glcdfont.c"
 #define SPLIT_WPM_ENABLE
 #define SPLIT_OLED_ENABLE
-#define OS_DETECTION_KEYBOARD_RESET
+
+#define COMBO_TERM 40
+#define COMBO_ONLY_FROM_LAYER 0
