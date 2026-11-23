@@ -130,37 +130,67 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 };
 
 #ifdef OLED_ENABLE
-// Displays are mounted vertically: 5 characters wide, 16 lines tall.
+#include "glcdfont.c" // the driver's font table, reused to draw double-height glyphs
+
+// Displays are mounted vertically: 32 pixels wide, 128 tall. Text is drawn
+// at double height (16px per line), 5 characters per line, 8 lines.
+#define OLED_LINE_CHARS 5
+
 oled_rotation_t oled_init_user(oled_rotation_t rotation) {
-    return is_keyboard_left() ? OLED_ROTATION_270 : OLED_ROTATION_90;
+    return OLED_ROTATION_270;
 }
 
-// Every row is exactly 5 characters, so the cursor wraps by itself: no newline needed.
-static void blank_line(void) {
-    oled_write_P(PSTR("     "), false);
+// Stretch the 4 low bits of a glyph column to 8 bits (each bit doubled).
+static uint8_t stretch_nibble(uint8_t nibble) {
+    uint8_t out = 0;
+    for (uint8_t bit = 0; bit < 4; bit++) {
+        if (nibble & (1 << bit)) {
+            out |= 3 << (bit * 2);
+        }
+    }
+    return out;
+}
+
+// Draw one 5-character line (PROGMEM string) at double height.
+static void draw_line(uint8_t line, const char *text, bool invert) {
+    const uint8_t mask = invert ? 0xFF : 0x00;
+    uint16_t      base = (uint16_t)line * 2 * OLED_DISPLAY_HEIGHT;
+    for (uint8_t i = 0; i < OLED_LINE_CHARS; i++) {
+        char c = pgm_read_byte(text + i);
+        for (uint8_t col = 0; col < OLED_FONT_WIDTH; col++) {
+            uint8_t glyph = pgm_read_byte(&font[(c - OLED_FONT_START) * OLED_FONT_WIDTH + col]);
+            uint8_t x     = i * OLED_FONT_WIDTH + col;
+            oled_write_raw_byte(stretch_nibble(glyph & 0x0F) ^ mask, base + x);
+            oled_write_raw_byte(stretch_nibble(glyph >> 4) ^ mask, base + OLED_DISPLAY_HEIGHT + x);
+        }
+    }
+    // Fill the unused right-edge columns so inverted lines are solid.
+    for (uint8_t x = OLED_LINE_CHARS * OLED_FONT_WIDTH; x < OLED_DISPLAY_HEIGHT; x++) {
+        oled_write_raw_byte(mask, base + x);
+        oled_write_raw_byte(mask, base + OLED_DISPLAY_HEIGHT + x);
+    }
 }
 
 static void render_layers(void) {
-    static const char PROGMEM names[][6] = {"ALPHA", "NUM  ", "NAV  ", "SYM  ", "FUN  ", "BT   "};
-    oled_write_P(PSTR("LAYER"), false);
-    blank_line();
+    static const char PROGMEM names[][OLED_LINE_CHARS + 1] = {"ALPHA", "NUM  ", "NAV  ", "SYM  ", "FUN  ", "BT   "};
+    draw_line(0, PSTR("LAYER"), false);
+    draw_line(1, PSTR("     "), false);
     layer_state_t top = get_highest_layer(layer_state | default_layer_state);
     for (uint8_t i = 0; i < ARRAY_SIZE(names); i++) {
-        oled_write_P(names[i], i == top);
+        draw_line(2 + i, names[i], i == top);
     }
 }
 
 static void render_mods(void) {
     uint8_t mods = get_mods() | get_oneshot_mods();
-    oled_write_P(PSTR("MODS "), false);
-    blank_line();
-    oled_write_P(PSTR("SHIFT"), mods & MOD_MASK_SHIFT);
-    oled_write_P(PSTR("CTRL "), mods & MOD_MASK_CTRL);
-    oled_write_P(PSTR("ALT  "), mods & MOD_BIT(KC_LALT));
-    oled_write_P(PSTR("ALTGR"), mods & MOD_BIT(KC_RALT));
-    oled_write_P(PSTR("GUI  "), mods & MOD_MASK_GUI);
-    blank_line();
-    oled_write_P(PSTR("CAPS "), host_keyboard_led_state().caps_lock);
+    draw_line(0, PSTR("MODS "), false);
+    draw_line(1, PSTR("     "), false);
+    draw_line(2, PSTR("SHIFT"), mods & MOD_MASK_SHIFT);
+    draw_line(3, PSTR("CTRL "), mods & MOD_MASK_CTRL);
+    draw_line(4, PSTR("ALT  "), mods & MOD_BIT(KC_LALT));
+    draw_line(5, PSTR("ALTGR"), mods & MOD_BIT(KC_RALT));
+    draw_line(6, PSTR("GUI  "), mods & MOD_MASK_GUI);
+    draw_line(7, PSTR("CAPS "), host_keyboard_led_state().caps_lock);
 }
 
 bool oled_task_user(void) {
